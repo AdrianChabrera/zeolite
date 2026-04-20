@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import character
+from .routes import location
+from .routes import group
+from .routes import object
+from .routes import event
 
 app = FastAPI(title="Zeolite", description="Zeolite backend")
 
@@ -13,6 +17,10 @@ app.add_middleware(
 )
 
 app.include_router(character.router)
+app.include_router(location.router)
+app.include_router(group.router)
+app.include_router(object.router)
+app.include_router(event.router)
 
 @app.get("/")
 async def root():
