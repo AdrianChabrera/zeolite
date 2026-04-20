@@ -1,8 +1,10 @@
-from pydantic import BaseModel
+from uuid import UUID, uuid4
 
-from backend.app.enums.character_status import CharacterStatus
+from pydantic import BaseModel, Field
+from app.enums.character_status import CharacterStatus
 
 class Character(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
     name: str
     race: str
     age: int
