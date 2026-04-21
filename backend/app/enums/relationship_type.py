@@ -34,7 +34,7 @@ class RelationshipType(str, Enum):
 
     # Character <-> Event
     PARTICIPATED_IN = "PARTICIPATED_IN"
-    CAUSED = "CAUSED"
+    TRIGGERED = "TRIGGERED"
     WITNESSED = "WITNESSED"
     AFFECTED_BY = "AFFECTED_BY"
 
@@ -57,5 +57,52 @@ class RelationshipType(str, Enum):
     # Object <-> Event
     USED_IN = "USED_IN"
 
-    # Generic
-    RELATED_TO = "RELATED_TO"
+    # Event <-> Event
+    CAUSED = "CAUSED"
+
+VALID_RELATIONSHIPS: dict[frozenset, list[RelationshipType]] = {
+    frozenset({"Character", "Character"}): [
+        RelationshipType.KNOWS, RelationshipType.ALLIED_WITH,
+        RelationshipType.ENEMY_OF, RelationshipType.FAMILY_OF,
+        RelationshipType.MENTOR_OF, RelationshipType.STUDENT_OF,
+        RelationshipType.BETRAYED, RelationshipType.LOVES,
+        RelationshipType.RIVALS_WITH,
+    ],
+    frozenset({"Character", "Location"}): [
+        RelationshipType.LIVES_IN, RelationshipType.BORN_IN,
+        RelationshipType.VISITED, RelationshipType.RULES,
+        RelationshipType.EXILED_FROM,
+    ],
+    frozenset({"Character", "Group"}): [
+        RelationshipType.MEMBER_OF, RelationshipType.LEADS,
+        RelationshipType.FOUNDED, RelationshipType.DEFECTED_FROM,
+    ],
+    frozenset({"Character", "Object"}): [
+        RelationshipType.OWNS, RelationshipType.CREATED,
+        RelationshipType.SEEKS, RelationshipType.LOST,
+    ],
+    frozenset({"Character", "Event"}): [
+        RelationshipType.PARTICIPATED_IN, RelationshipType.CAUSED,
+        RelationshipType.WITNESSED, RelationshipType.AFFECTED_BY,
+    ],
+    frozenset({"Location", "Location"}): [
+        RelationshipType.PART_OF, RelationshipType.BORDERS,
+        RelationshipType.CONNECTED_TO,
+    ],
+    frozenset({"Location", "Event"}): [
+        RelationshipType.SITE_OF,
+    ],
+    frozenset({"Group", "Group"}): [
+        RelationshipType.ALLIED_GROUPS, RelationshipType.AT_WAR_WITH,
+        RelationshipType.SUBGROUP_OF,
+    ],
+    frozenset({"Group", "Event"}): [
+        RelationshipType.INVOLVED_IN,
+    ],
+    frozenset({"Object", "Event"}): [
+        RelationshipType.USED_IN,
+    ],
+    frozenset({"Event", "Event"}): [
+        RelationshipType.CAUSED,
+    ],
+}
