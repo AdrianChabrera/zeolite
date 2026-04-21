@@ -9,28 +9,75 @@ const ENTITY_COLORS: Record<EntityType, string> = {
   Event:     '#ca5cf6',
 };
 
+const POSITIONS_KEY = 'graph_node_positions';
+
+export function loadSavedPositions(): Record<string, { x: number; y: number }> {
+  try {
+    return JSON.parse(localStorage.getItem(POSITIONS_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function saveNodePositions(nodes: Node[]) {
+  const positions: Record<string, { x: number; y: number }> = {};
+  for (const node of nodes) {
+    positions[node.id] = node.position;
+  }
+  localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions));
+}
+
+export function buildCircularPositions(
+  nodes: Node[]
+): Record<string, { x: number; y: number }> {
+  const total  = nodes.length;
+  const radius = Math.max(150, total * 30);
+  const positions: Record<string, { x: number; y: number }> = {};
+
+  nodes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / total;
+    positions[node.id] = {
+      x: radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    };
+  });
+
+  return positions;
+}
+
 export function buildGraph(
   allNodes: { id: string; name: string; entityType: EntityType }[],
   relationships: GraphRelationship[]
 ): { nodes: Node[]; edges: Edge[] } {
 
-  const total = allNodes.length;
-  const radius = Math.max(250, total * 70);
+  const saved  = loadSavedPositions();
+  const total  = allNodes.length;
+  const radius = Math.max(250, total * 30);
 
-  const nodes: Node[] = allNodes.map((entity, i) => {
-    const angle = (2 * Math.PI * i) / total;
+  // Posición circular solo para nodos que no están en localStorage
+  const newNodes = allNodes.filter(e => !saved[e.id]);
+  const newTotal = newNodes.length;
+  const circularPositions: Record<string, { x: number; y: number }> = {};
+  newNodes.forEach((entity, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(newTotal, 1);
+    circularPositions[entity.id] = {
+      x: radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    };
+  });
+
+  const nodes: Node[] = allNodes.map((entity) => {
+    const position = saved[entity.id] ?? circularPositions[entity.id];
+
     return {
       id: entity.id,
       type: 'floatingNode',
       data: {
-        label: `${entity.name}\n(${entity.entityType})`,
+        label: entity.name,
         entityType: entity.entityType,
         name: entity.name,
       },
-      position: {
-        x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle),
-      },
+      position,
       style: {
         background: ENTITY_COLORS[entity.entityType],
         color: '#fff',
@@ -48,18 +95,16 @@ export function buildGraph(
       r => (r.from_id === rel.from_id && r.to_id === rel.to_id) ||
            (r.from_id === rel.to_id   && r.to_id === rel.from_id)
     );
-    
-    const index = samePair.findIndex(r => r.id === rel.id);
+
+    const index     = samePair.findIndex(r => r.id === rel.id);
     const totalPair = samePair.length;
 
     let edgeOffset = 0;
-    
     if (totalPair > 1) {
-      const step = 45; 
+      const step       = 45;
       const baseOffset = (index - (totalPair - 1) / 2) * step;
-
-      const isReversed = rel.from_id > rel.to_id; 
-      edgeOffset = isReversed ? -baseOffset : baseOffset;
+      const isReversed = rel.from_id > rel.to_id;
+      edgeOffset       = isReversed ? -baseOffset : baseOffset;
     }
 
     return {

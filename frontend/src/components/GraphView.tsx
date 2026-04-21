@@ -9,10 +9,12 @@ import {
   useNodesState,
   useEdgesState,
   type Connection,
+  type NodeChange,
+  applyNodeChanges,
 } from '@xyflow/react';
 
 import { fetchAllRelationships, fetchAllNodes } from '../api/graph';
-import { buildGraph } from '../utils/buildGraph';
+import { buildGraph, saveNodePositions, buildCircularPositions } from '../utils/buildGraph';
 import FloatingNode from './FloatingNode';
 import FloatingEdge from './FloatingEdge';
 import RelationshipModal from './modals/RelationshipModal';
@@ -23,16 +25,16 @@ const nodeTypes = { floatingNode: FloatingNode };
 const edgeTypes  = { floating: FloatingEdge };
 
 interface PendingConnection {
-  fromId: string;
-  fromType: string;
-  fromName: string;
-  toId: string;
-  toType: string;
-  toName: string;
+  fromId: string; fromType: string; fromName: string;
+  toId: string;   toType: string;   toName: string;
 }
 
-export default function GraphView() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<XYNode>([]);
+interface Props {
+  onLoadReady?: (loadFn: () => void) => void;
+}
+
+export default function GraphView({ onLoadReady }: Props) {
+  const [nodes, setNodes] = useNodesState<XYNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<XYEdge>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -46,6 +48,7 @@ export default function GraphView() {
     Promise.all([fetchAllNodes(), fetchAllRelationships()])
       .then(([allNodes, relationships]) => {
         const { nodes: n, edges: e } = buildGraph(allNodes, relationships);
+        saveNodePositions(n);
         setNodesRef.current(n);
         setEdgesRef.current(e);
         setLoading(false);
@@ -56,13 +59,35 @@ export default function GraphView() {
       });
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    onLoadReady?.(load);
+    load();
+  }, [load, onLoadReady]);
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes(prev => {
+      const next = applyNodeChanges(changes, prev);
+      const hasDragEnd = changes.some(
+        c => c.type === 'position' && (c as any).dragging === false
+      );
+      if (hasDragEnd) saveNodePositions(next);
+      return next;
+    });
+  }, [setNodes]);
+
+  const resetLayout = useCallback(() => {
+    setNodes(prev => {
+      const positions = buildCircularPositions(prev);
+      const next = prev.map(n => ({ ...n, position: positions[n.id] }));
+      saveNodePositions(next);
+      return next;
+    });
+  }, [setNodes]);
 
   const onConnect = useCallback((connection: Connection) => {
     const sourceNode = nodes.find(n => n.id === connection.source);
     const targetNode = nodes.find(n => n.id === connection.target);
     if (!sourceNode || !targetNode) return;
-
     setPending({
       fromId:   sourceNode.id,
       fromType: sourceNode.data.entityType as string,
@@ -74,10 +99,7 @@ export default function GraphView() {
   }, [nodes]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: XYNode) => {
-    setSelectedNode({
-      id: node.id,
-      entityType: node.data.entityType as string,
-    });
+    setSelectedNode({ id: node.id, entityType: node.data.entityType as string });
   }, []);
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: XYEdge) => {
@@ -89,7 +111,24 @@ export default function GraphView() {
 
   return (
     <>
-      <div style={{ width: '100%', height: '100vh', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 16, right: 1250, zIndex: 10 }}>
+          <button
+            onClick={resetLayout}
+            style={{
+              background: '#3e3e5e',
+              color: '#f3f4f6',
+              border: '1px solid #6366f1',
+              borderRadius: 6,
+              padding: '6px 14px',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            ↺ Reset layout
+          </button>
+        </div>
+
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -122,7 +161,6 @@ export default function GraphView() {
           onCreated={() => { setPending(null); load(); }}
         />
       )}
-
       {selectedNode && (
         <NodeDetailModal
           id={selectedNode.id}
@@ -131,7 +169,6 @@ export default function GraphView() {
           onUpdated={() => { setSelectedNode(null); load(); }}
         />
       )}
-
       {selectedEdge && (
         <RelationshipDetailModal
           id={selectedEdge}
