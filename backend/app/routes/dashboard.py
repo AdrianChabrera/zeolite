@@ -27,34 +27,6 @@ def get_world_summary(db=Depends(get_db)):
         "total_nodes": record["chars"] + record["locs"] + record["groups"] + record["objs"] + record["evts"]
     }
 
-@router.get("/location-importance")
-def get_location_importance(db=Depends(get_db)):
-    """Analiza qué localizaciones son clave basándose en los eventos que ocurren allí."""
-    query = """
-    MATCH (e:Event)-[:SITE_OF]-(l:Location)
-    RETURN 
-        l.name AS location, 
-        count(e) AS total_events, 
-        sum(e.importance) AS cumulative_importance,
-        collect(e.name) AS events
-    ORDER BY cumulative_importance DESC
-    """
-    result = db.run(query)
-    return [dict(record) for record in result]
-
-@router.get("/character-network/{character_id}")
-def get_character_influence(character_id: str, db=Depends(get_db)):
-    query = """
-    MATCH (c:Character {id: $id})-[:ALLIED_WITH|KNOWS|FAMILY_OF*1..2]-(connected)
-    WHERE c <> connected
-    RETURN 
-        connected.name AS name, 
-        labels(connected)[0] AS type,
-        connected.id AS id
-    """
-    result = db.run(query, id=character_id)
-    return [dict(record) for record in result]
-
 @router.get("/plot-holes")
 def get_plot_holes(db=Depends(get_db)):
     query = """
@@ -64,6 +36,7 @@ def get_plot_holes(db=Depends(get_db)):
         n.name AS name, 
         labels(n)[0] AS type, 
         n.id AS id
+    ORDER BY type ASC, name ASC
     """
     result = db.run(query)
     return [dict(record) for record in result]
@@ -77,19 +50,6 @@ def get_story_hotspots(db=Depends(get_db)):
         count(e) AS event_count, 
         avg(e.importance) AS average_impact
     ORDER BY average_impact DESC
-    """
-    result = db.run(query)
-    return [dict(record) for record in result]
-
-@router.get("/event-chain")
-def get_event_chain(db=Depends(get_db)):
-    query = """
-    MATCH (e1:Event)-[:CAUSED]->(e2:Event)
-    RETURN 
-        e1.name AS cause, 
-        e1.importance AS cause_impact,
-        e2.name AS consequence,
-        e2.importance AS consequence_impact
     """
     result = db.run(query)
     return [dict(record) for record in result]
@@ -122,3 +82,81 @@ def get_character_full_context(character_id: str, db=Depends(get_db)):
     """
     result = db.run(query, id=character_id)
     return result.single().data()
+
+@router.get("/audit/narrative-orphans")
+def get_narrative_orphans(db=Depends(get_db)):
+    query = """
+    MATCH (c:Character)
+    WHERE NOT (c)-[:BORN_IN]->(:Location)
+    RETURN c.id AS id, c.name AS name, "Character" AS type, 
+           "NARRATIVE_ORPHAN" AS issue, "No birth location" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/isolated-characters")
+def get_isolated_characters(db=Depends(get_db)):
+    query = """
+    MATCH (c:Character)
+    WHERE NOT (c)-[]-(:Character)
+    RETURN c.id AS id, c.name AS name, "Character" AS type, 
+           "ISOLATED_CHARACTER" AS issue, "No relationships with other characters" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/empty-stages")
+def get_empty_stages(db=Depends(get_db)):
+    query = """
+    MATCH (l:Location)
+    WHERE NOT (l)-[]-(:Event) AND NOT (l)-[]-(:Character)
+    RETURN l.id AS id, l.name AS name, "Location" AS type, 
+           "EMPTY_STAGE" AS issue, "No events or characters connected" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/ghost-events")
+def get_ghost_events(db=Depends(get_db)):
+    query = """
+    MATCH (e:Event)
+    WHERE NOT (e)<-[:WITNESSED]-(:Character) AND NOT (e)<-[:PARTICIPATED_IN]-(:Character)
+    RETURN e.id AS id, e.name AS name, "Event" AS type, 
+           "GHOST_EVENT" AS issue, "No witnesses or participants" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/consequence-gaps")
+def get_consequence_gaps(db=Depends(get_db)):
+    query = """
+    MATCH (e:Event)
+    WHERE NOT (e)-[:CAUSED]->(:Event)
+    RETURN e.id AS id, e.name AS name, "Event" AS type, 
+           "CONSEQUENCE_GAP" AS issue, "Dead-end narrative branch" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/forgotten-objects")
+def get_forgotten_objects(db=Depends(get_db)):
+    query = """
+    MATCH (o:Object)
+    WHERE NOT (o)-[:OWNS|:LOST|:CREATED]-(:Character)
+      AND NOT (o)-[:USED_IN]-(:Event)
+    RETURN o.id AS id, o.name AS name, "Object" AS type, 
+           "FORGOTTEN_OBJECT" AS issue, "Object is not owned by anyone or used in events" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
+
+@router.get("/audit/empty-groups")
+def get_empty_groups(db=Depends(get_db)):
+    query = """
+    MATCH (g:Group {is_active: true})
+    WHERE NOT (g)<-[:MEMBER_OF|LEADS]-(:Character)
+    RETURN g.id AS id, g.name AS name, "Group" AS type, 
+           "EMPTY_GROUP" AS issue, "No active members or leaders" AS detail
+    """
+    result = db.run(query)
+    return [dict(record) for record in result]
