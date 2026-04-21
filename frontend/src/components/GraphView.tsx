@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -20,6 +20,7 @@ import FloatingEdge from './FloatingEdge';
 import RelationshipModal from './modals/RelationshipModal';
 import NodeDetailModal from './modals/NodeDetailModal';
 import RelationshipDetailModal from './modals/RelationshipDetailModal';
+import type { EntityType } from '../types/graph';
 
 const nodeTypes = { floatingNode: FloatingNode };
 const edgeTypes  = { floating: FloatingEdge };
@@ -31,9 +32,10 @@ interface PendingConnection {
 
 interface Props {
   onLoadReady?: (loadFn: () => void) => void;
+  hiddenTypes: Set<EntityType>;
 }
 
-export default function GraphView({ onLoadReady }: Props) {
+export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
   const [nodes, setNodes] = useNodesState<XYNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<XYEdge>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,31 @@ export default function GraphView({ onLoadReady }: Props) {
     onLoadReady?.(load);
     load();
   }, [load, onLoadReady]);
+
+  // Derive visible nodes and edges from hiddenTypes without touching stored state
+  const visibleNodes = useMemo(() => {
+    if (hiddenTypes.size === 0) return nodes;
+    return nodes.map(n => ({
+      ...n,
+      hidden: hiddenTypes.has(n.data.entityType as EntityType),
+    }));
+  }, [nodes, hiddenTypes]);
+
+  const hiddenNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const n of nodes) {
+      if (hiddenTypes.has(n.data.entityType as EntityType)) ids.add(n.id);
+    }
+    return ids;
+  }, [nodes, hiddenTypes]);
+
+  const visibleEdges = useMemo(() => {
+    if (hiddenNodeIds.size === 0) return edges;
+    return edges.map(e => ({
+      ...e,
+      hidden: hiddenNodeIds.has(e.source) || hiddenNodeIds.has(e.target),
+    }));
+  }, [edges, hiddenNodeIds]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(prev => {
@@ -130,8 +157,8 @@ export default function GraphView({ onLoadReady }: Props) {
         </div>
 
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={visibleNodes}
+          edges={visibleEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
