@@ -11,6 +11,8 @@ import {
   type Connection,
   type NodeChange,
   applyNodeChanges,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 
 import { fetchAllRelationships, fetchAllNodes } from '../api/graph';
@@ -33,9 +35,10 @@ interface PendingConnection {
 interface Props {
   onLoadReady?: (loadFn: () => void) => void;
   hiddenTypes: Set<EntityType>;
+  searchQuery: string;
 }
 
-export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
+function GraphViewInner({ onLoadReady, hiddenTypes, searchQuery }: Props) {
   const [nodes, setNodes] = useNodesState<XYNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<XYEdge>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +46,11 @@ export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
   const [pending, setPending] = useState<PendingConnection | null>(null);
   const [selectedNode, setSelectedNode] = useState<{ id: string; entityType: string } | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [searchIndex, setSearchIndex] = useState(0);
   const setNodesRef = useRef(setNodes);
   const setEdgesRef = useRef(setEdges);
+
+  const { fitBounds } = useReactFlow();
 
   const load = useCallback(() => {
     Promise.all([fetchAllNodes(), fetchAllRelationships()])
@@ -66,14 +72,47 @@ export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
     load();
   }, [load, onLoadReady]);
 
-  // Derive visible nodes and edges from hiddenTypes without touching stored state
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchIndex(0);
+  }, [searchQuery]);
+
+  const matchedNodes = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return nodes.filter(n =>
+      (n.data.name as string)?.toLowerCase().includes(q)
+    );
+  }, [nodes, searchQuery]);
+
+  useEffect(() => {
+    if (matchedNodes.length === 0) return;
+    const idx = Math.min(searchIndex, matchedNodes.length - 1);
+    const node = matchedNodes[idx];
+    const W = 130, H = 40;
+    fitBounds(
+      { x: node.position.x - 20, y: node.position.y - 20, width: W + 40, height: H + 40 },
+      { duration: 500, padding: 0.6 }
+    );
+  }, [matchedNodes, searchIndex, fitBounds]);
+
   const visibleNodes = useMemo(() => {
-    if (hiddenTypes.size === 0) return nodes;
+    if (hiddenTypes.size === 0 && !searchQuery.trim()) return nodes;
+    const matchedIds = new Set(matchedNodes.map(n => n.id));
     return nodes.map(n => ({
       ...n,
       hidden: hiddenTypes.has(n.data.entityType as EntityType),
+      style: {
+        ...n.style,
+        outline: (searchQuery.trim() && matchedIds.has(n.id))
+          ? '2px solid #fbbf24'
+          : 'none',
+        boxShadow: (searchQuery.trim() && matchedIds.has(n.id))
+          ? '0 0 0 3px #fbbf2466'
+          : 'none',
+      },
     }));
-  }, [nodes, hiddenTypes]);
+  }, [nodes, hiddenTypes, searchQuery, matchedNodes]);
 
   const hiddenNodeIds = useMemo(() => {
     const ids = new Set<string>();
@@ -136,6 +175,8 @@ export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
   if (loading) return <p style={{ padding: 24, color: '#9ca3af' }}>Loading graph…</p>;
   if (error)   return <p style={{ padding: 24, color: '#f87171' }}>{error}</p>;
 
+  const safeIndex = matchedNodes.length > 0 ? Math.min(searchIndex, matchedNodes.length - 1) : 0;
+
   return (
     <>
       <div style={{ width: '100%', height: '100vh', overflow: 'hidden', position: 'relative' }}>
@@ -155,6 +196,55 @@ export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
             ↺ Reset layout
           </button>
         </div>
+
+        {searchQuery.trim() && (
+          <div style={{
+            position: 'absolute', bottom: 28, left: 172, zIndex: 20,
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: '#1e1e2e', border: '1px solid #3e3e5e',
+            borderRadius: 8, padding: '5px 10px',
+            fontSize: 12, color: '#e2e8f0',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+          }}>
+            {matchedNodes.length === 0 ? (
+              <span style={{ color: '#6b7280' }}>Sin coincidencias</span>
+            ) : (
+              <>
+                <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+                  {safeIndex + 1} / {matchedNodes.length}
+                </span>
+                <button
+                  onClick={() => setSearchIndex(i => (i - 1 + matchedNodes.length) % matchedNodes.length)}
+                  disabled={matchedNodes.length <= 1}
+                  title="Anterior"
+                  style={{
+                    background: 'none', border: '1px solid #3e3e5e', color: '#e2e8f0',
+                    borderRadius: 4, width: 22, height: 22, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, padding: 0,
+                    opacity: matchedNodes.length <= 1 ? 0.3 : 1,
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={() => setSearchIndex(i => (i + 1) % matchedNodes.length)}
+                  disabled={matchedNodes.length <= 1}
+                  title="Siguiente"
+                  style={{
+                    background: 'none', border: '1px solid #3e3e5e', color: '#e2e8f0',
+                    borderRadius: 4, width: 22, height: 22, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, padding: 0,
+                    opacity: matchedNodes.length <= 1 ? 0.3 : 1,
+                  }}
+                >
+                  ›
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <ReactFlow
           nodes={visibleNodes}
@@ -204,5 +294,13 @@ export default function GraphView({ onLoadReady, hiddenTypes }: Props) {
         />
       )}
     </>
+  );
+}
+
+export default function GraphView(props: Props) {
+  return (
+    <ReactFlowProvider>
+      <GraphViewInner {...props} />
+    </ReactFlowProvider>
   );
 }

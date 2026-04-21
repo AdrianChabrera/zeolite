@@ -7,6 +7,7 @@ import type { EntityType } from './types/graph';
 export default function App() {
   const reloadRef = useRef<() => void>(() => {});
   const [hiddenTypes, setHiddenTypes] = useState<Set<EntityType>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleToggleType = useCallback((type: EntityType) => {
     setHiddenTypes(prev => {
@@ -26,11 +27,14 @@ export default function App() {
         onCreated={() => reloadRef.current()}
         hiddenTypes={hiddenTypes}
         onToggleType={handleToggleType}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
       <div style={{ marginLeft: 160, height: '100vh' }}>
         <GraphView
           onLoadReady={(fn) => { reloadRef.current = fn; }}
           hiddenTypes={hiddenTypes}
+          searchQuery={searchQuery}
         />
       </div>
       <Dashboard />

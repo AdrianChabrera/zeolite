@@ -11,6 +11,8 @@ interface Props {
   onCreated: () => void;
   hiddenTypes: Set<EntityType>;
   onToggleType: (type: EntityType) => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
 }
 
 type ModalType = 'character' | 'location' | 'group' | 'object' | 'event' | null;
@@ -23,7 +25,7 @@ const ENTITY_BUTTONS: { type: ModalType; label: string; color: string; entityTyp
   { type: 'event',     label: 'Event',     color: '#ca5cf6', entityType: 'Event'     },
 ];
 
-export default function SidePanel({ onCreated, hiddenTypes, onToggleType }: Props) {
+export default function SidePanel({ onCreated, hiddenTypes, onToggleType, searchQuery, onSearchChange }: Props) {
   const [open, setOpen] = useState<ModalType>(null);
 
   return (
@@ -31,7 +33,7 @@ export default function SidePanel({ onCreated, hiddenTypes, onToggleType }: Prop
       <div style={{
         position: 'fixed', left: 0, top: 0, height: '100vh',
         width: 160, background: '#12121e', borderRight: '1px solid #2e2e4e',
-        display: 'flex', flexDirection: 'column', gap: 10,
+        display: 'flex', flexDirection: 'column', gap: 11,
         padding: '20px 12px', zIndex: 10, overflowY: 'auto',
       }}>
 
@@ -108,7 +110,45 @@ export default function SidePanel({ onCreated, hiddenTypes, onToggleType }: Prop
           );
         })}
 
-              <div style={{ height: '1px', background: '#2e2e4e', margin: '2px 0 4px' }} />
+        <div style={{ height: '1px', background: '#2e2e4e', margin: '6px 0 4px' }} />
+
+        <div style={{ marginTop: 4 }}>
+          <p style={{ color: '#6b7280', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>
+            Search
+          </p>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search a node…"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                background: '#1e1e2e',
+                border: searchQuery ? '1px solid #6366f1' : '1px solid #2e2e4e',
+                borderRadius: 6,
+                color: '#e2e8f0',
+                fontSize: 12,
+                padding: '7px 26px 7px 10px',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange('')}
+                style={{
+                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer',
+                  padding: 0, fontSize: 13, lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
 
       </div>
 
