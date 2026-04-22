@@ -25,3 +25,5 @@ export const deleteLocation  = (id: string) => axios.delete(`${API}/locations/${
 export const deleteGroup     = (id: string) => axios.delete(`${API}/groups/${id}`);
 export const deleteObject    = (id: string) => axios.delete(`${API}/objects/${id}`);
 export const deleteEvent     = (id: string) => axios.delete(`${API}/events/${id}`);
+
+export const getCharacterFullContext = (id: string) => axios.get(`${API}/dashboard/basic/character-full-context/${id}`);

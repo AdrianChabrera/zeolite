@@ -54,7 +54,6 @@ export function buildGraph(
   const total  = allNodes.length;
   const radius = Math.max(250, total * 30);
 
-  // Posición circular solo para nodos que no están en localStorage
   const newNodes = allNodes.filter(e => !saved[e.id]);
   const newTotal = newNodes.length;
   const circularPositions: Record<string, { x: number; y: number }> = {};

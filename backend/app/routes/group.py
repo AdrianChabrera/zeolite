@@ -5,24 +5,19 @@ from app.models.group import Group
 router = APIRouter(prefix="/api/groups", tags=["Groups"])
 
 @router.post("", status_code=201)
-def create_group(group: Group, db=Depends(get_db)):
+def create_group(payload: dict, db=Depends(get_db)):
+    group_id = payload.get("id")
+    if not group_id:
+        raise HTTPException(status_code=400, detail="ID is required")
+
     query = """
-    CREATE (g:Group {
-        id: $id,
-        name: $name,
-        description: $description,
-        is_active: $is_active
-    })
+    MERGE (g:Group {id: $id})
+    ON CREATE SET g += $props
     RETURN g
     """
-    result = db.run(
-        query,
-        id=str(group.id),
-        name=group.name,
-        description=group.description,
-        is_active=group.is_active,
-    )
+    result = db.run(query, id=str(group_id), props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=500, detail="Group could not be created")
     return {"message": "Group created", "data": dict(record["g"])}
@@ -46,22 +41,15 @@ def get_group(group_id: str, db=Depends(get_db)):
 
 
 @router.put("/{group_id}")
-def update_group(group_id: str, group: Group, db=Depends(get_db)):
+def update_group(group_id: str, payload: dict, db=Depends(get_db)):
     query = """
     MATCH (g:Group {id: $id})
-    SET g.name = $name,
-        g.description = $description,
-        g.is_active = $is_active
+    SET g = $props
     RETURN g
     """
-    result = db.run(
-        query,
-        id=group_id,
-        name=group.name,
-        description=group.description,
-        is_active=group.is_active,
-    )
+    result = db.run(query, id=group_id, props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=404, detail="Group not found")
     return {"message": "Group updated", "data": dict(record["g"])}

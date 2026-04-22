@@ -5,27 +5,27 @@ from app.models.event import Event
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
 @router.post("", status_code=201)
-def create_event(event: Event, db=Depends(get_db)):
+def create_event(payload: dict, db=Depends(get_db)):
+    event_id = payload.get("id")
+    if not event_id:
+        raise HTTPException(status_code=400, detail="ID is required")
+
     query = """
-    CREATE (e:Event {
-        id: $id,
-        name: $name,
-        description: $description,
-        importance: $importance
-    })
+    MERGE (e:Event {id: $id})
+    ON CREATE SET e = $props
     RETURN e
     """
-    result = db.run(
-        query,
-        id=str(event.id),
-        name=event.name,
-        description=event.description,
-        importance=event.importance,
-    )
+    
+    result = db.run(query, id=str(event_id), props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=500, detail="Event could not be created")
-    return {"message": "Event created", "data": dict(record["e"])}
+    
+    return {
+        "message": "Event created", 
+        "data": dict(record["e"])
+    }
 
 
 @router.get("")
@@ -46,25 +46,25 @@ def get_event(event_id: str, db=Depends(get_db)):
 
 
 @router.put("/{event_id}")
-def update_event(event_id: str, event: Event, db=Depends(get_db)):
+def update_event(event_id: str, payload: dict, db=Depends(get_db)):
+    payload["id"] = event_id 
+
     query = """
     MATCH (e:Event {id: $id})
-    SET e.name = $name,
-        e.description = $description,
-        e.importance = $importance
+    SET e = $props
     RETURN e
     """
-    result = db.run(
-        query,
-        id=event_id,
-        name=event.name,
-        description=event.description,
-        importance=event.importance,
-    )
+    
+    result = db.run(query, id=event_id, props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=404, detail="Event not found")
-    return {"message": "Event updated", "data": dict(record["e"])}
+        
+    return {
+        "message": "Event updated", 
+        "data": dict(record["e"])
+    }
 
 
 @router.delete("/{event_id}", status_code=204)

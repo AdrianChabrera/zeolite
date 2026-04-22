@@ -5,24 +5,19 @@ from app.models.location import Location
 router = APIRouter(prefix="/api/locations", tags=["Locations"])
 
 @router.post("", status_code=201)
-def create_location(location: Location, db=Depends(get_db)):
+def create_location(payload: dict, db=Depends(get_db)):
+    loc_id = payload.get("id")
+    if not loc_id:
+        raise HTTPException(status_code=400, detail="ID is required")
+
     query = """
-    CREATE (l:Location {
-        id: $id,
-        name: $name,
-        description: $description,
-        category: $category
-    })
-    RETURN l    
+    MERGE (l:Location {id: $id})
+    ON CREATE SET l += $props
+    RETURN l
     """
-    result = db.run(
-        query,
-        id=str(location.id),
-        name=location.name,
-        description=location.description,
-        category=location.category.value,
-    )
+    result = db.run(query, id=str(loc_id), props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=500, detail="Location could not be created")
     return {"message": "Location created", "data": dict(record["l"])}
@@ -46,22 +41,15 @@ def get_location(location_id: str, db=Depends(get_db)):
 
 
 @router.put("/{location_id}")
-def update_location(location_id: str, location: Location, db=Depends(get_db)):
+def update_location(location_id: str, payload: dict, db=Depends(get_db)):
     query = """
     MATCH (l:Location {id: $id})
-    SET l.name = $name,
-        l.description = $description,
-        l.category = $category
+    SET l = $props
     RETURN l
     """
-    result = db.run(
-        query,
-        id=location_id,
-        name=location.name,
-        description=location.description,
-        category=location.category.value,
-    )
+    result = db.run(query, id=location_id, props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=404, detail="Location not found")
     return {"message": "Location updated", "data": dict(record["l"])}

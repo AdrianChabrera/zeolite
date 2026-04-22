@@ -5,35 +5,27 @@ from app.models.character import Character
 router = APIRouter(prefix="/api/characters", tags=["Characters"])
 
 @router.post("", status_code=201)
-def create_character(character: Character, db=Depends(get_db)):
+def create_character(payload: dict, db=Depends(get_db)):
+    char_id = payload.get("id")
+    if not char_id:
+        raise HTTPException(status_code=400, detail="ID is required")
+
     query = """
     MERGE (c:Character {id: $id})
-    ON CREATE SET 
-        c.name = $name,
-        c.race = $race,
-        c.age = $age,
-        c.status = $status,
-        c.biography = $biography,
-        c.personality = $personality,
-        c.appearance = $appearance
+    ON CREATE SET c = $props
     RETURN c
     """
-    result = db.run(
-        query,
-        id=str(character.id),
-        name=character.name,
-        race=character.race,
-        age=character.age,
-        status=character.status.value,
-        biography=character.biography,
-        personality=character.personality,
-        appearance=character.appearance
-    )
+    
+    result = db.run(query, id=str(char_id), props=payload)
     record = result.single()
+    
     if not record:
         raise HTTPException(status_code=500, detail="Character could not be created")
     
-    return {"message": "Character created", "data": dict(record["l"] if "l" in record else record["c"])}
+    return {
+        "message": "Character created", 
+        "data": dict(record["c"])
+    }
 
 
 @router.get("")
@@ -54,29 +46,13 @@ def get_character(character_id: str, db=Depends(get_db)):
 
 
 @router.put("/{character_id}")
-def update_character(character_id: str, character: Character, db=Depends(get_db)):
+def update_character(character_id: str, payload: dict, db=Depends(get_db)):
     query = """
     MATCH (c:Character {id: $id})
-    SET c.name = $name,
-        c.race = $race,
-        c.age = $age,
-        c.status = $status,
-        c.biography = $biography,
-        c.personality = $personality,
-        c.appearance = $appearance
+    SET c = $props
     RETURN c
     """
-    result = db.run(
-        query,
-        id=character_id,
-        name=character.name,
-        race=character.race,
-        age=character.age,
-        status=character.status.value,
-        biography=character.biography,
-        personality=character.personality,
-        appearance=character.appearance
-    )
+    result = db.run(query, id=character_id, props=payload)
     record = result.single()
     if not record:
         raise HTTPException(status_code=404, detail="Character not found")
