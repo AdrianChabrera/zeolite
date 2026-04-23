@@ -173,7 +173,7 @@ return (
 
             <Card title="SOCIAL CENTRALITY (Ranking)">
               <p style={{ color: '#6b7280', fontSize: 12, marginBottom: 12, marginTop: -6 }}>
-                Characters with the highest number of direct connections.
+                Characters with the highest number of direct connections with other characters.
               </p>
               {centrality.slice(0, 5).map((c, i) => (
                 <div key={i} style={{ marginBottom: 8 }}>
