@@ -25,7 +25,9 @@ const MiniGraph: React.FC<MiniGraphProps> = ({
   connections = [],
   entityColors = DEFAULT_COLORS 
 }) => {
-  const safeConnections = Array.isArray(connections) ? connections : [];
+  const safeConnections = Array.isArray(connections) 
+      ? connections.filter(rel => rel && rel.entity) 
+      : [];
   const total = safeConnections.length;
 
   return (
