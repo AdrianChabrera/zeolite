@@ -180,7 +180,7 @@ function GraphViewInner({ onLoadReady, hiddenTypes, searchQuery }: Props) {
   return (
     <>
       <div style={{ width: '100%', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 16, right: 1250, zIndex: 10 }}>
+        <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 10 }}>
           <button
             onClick={resetLayout}
             style={{
